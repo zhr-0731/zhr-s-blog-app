@@ -1,7 +1,7 @@
 pluginManagement {
     repositories {
-        google()
-        mavenCentral()
+        google() // 必须包含 Google 仓库
+        mavenCentral() // 必须包含 Maven Central 仓库
         gradlePluginPortal()
     }
 }
