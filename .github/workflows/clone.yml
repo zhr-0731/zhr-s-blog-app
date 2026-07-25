@@ -1,0 +1,39 @@
+name: Sync Android Source to main (with workflow preserved)
+
+on:
+  workflow_dispatch:
+
+# 关键：授予写入仓库内容的权限
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+        with:
+          path: current
+
+      - name: Clone GitCode repository
+        run: |
+          git clone https://gitcode.com/zhr-0731/blog-android.git source
+
+      - name: Preserve .github directory
+        run: |
+          rm -rf source/.github
+          cp -r current/.github source/.github
+
+      - name: Configure Git user
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Push to main (force)
+        run: |
+          cd source
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/zhr-0731/zhr-s-blog-app.git
+          git add .
+          git commit -m "Sync from GitCode + preserve .github" --allow-empty
+          git push origin HEAD:main --force
