@@ -2,78 +2,45 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+    branches: [ main ]
+  workflow_dispatch:   # 允许手动触发
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      # 1. 检出代码
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 2. 设置 JDK 17（Android Gradle 插件 8.2.0 需要）
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
-      # ==================== 自动生成 Gradle Wrapper（若缺失） ====================
-      - name: Check and generate Gradle Wrapper if missing
+      # 3. 安装指定版本的 Gradle（用于生成 Wrapper）
+      - name: Setup Gradle 8.2
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2'
+
+      # 4. 如果 gradle-wrapper.jar 缺失，则生成它
+      - name: Generate Gradle Wrapper if missing
         run: |
           if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "⚠️ gradle-wrapper.jar not found, generating with system Gradle..."
+            echo "⚠️ gradle-wrapper.jar not found, generating..."
             gradle wrapper
             chmod +x gradlew
           else
             echo "✅ gradle-wrapper.jar already exists."
           fi
 
-      # ==================== 从指定 URL 下载图标 ====================
-      - name: Download icon from URL
-        run: |
-          ICON_URL="https://s41.ax1x.com/2025/12/07/pZnSiid.png"
-          echo "📥 Downloading icon from $ICON_URL"
-          curl -L -o icon.png "$ICON_URL"
-          
-          # 检查是否下载成功
-          if [ ! -f "icon.png" ] || [ ! -s "icon.png" ]; then
-            echo "❌ Failed to download icon, creating placeholder..."
-            convert -size 192x192 xc:blue -fill white -gravity center -pointsize 72 -annotate 0 "B" icon.png
-          else
-            echo "✅ Icon downloaded successfully"
-            file icon.png
-          fi
-
-      - name: Convert icon to Android mipmap resources
-        run: |
-          # 创建所有 mipmap 目录
-          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            mkdir -p app/src/main/res/mipmap-$density
-          done
-
-          # 定义尺寸
-          declare -A sizes=(
-            [mdpi]=48
-            [hdpi]=72
-            [xhdpi]=96
-            [xxhdpi]=144
-            [xxxhdpi]=192
-          )
-
-          # 生成 ic_launcher.png 和 ic_launcher_round.png
-          for density in "${!sizes[@]}"; do
-            size=${sizes[$density]}
-            convert icon.png -resize ${size}x${size} -background transparent -gravity center -extent ${size}x${size} app/src/main/res/mipmap-$density/ic_launcher.png
-            cp app/src/main/res/mipmap-$density/ic_launcher.png app/src/main/res/mipmap-$density/ic_launcher_round.png
-          done
-
-          echo "✅ Android icons generated successfully."
-
-      # ==================== 缓存 Gradle ====================
+      # 5. 缓存 Gradle 依赖（加速构建）
       - name: Cache Gradle packages
         uses: actions/cache@v3
         with:
@@ -83,15 +50,12 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
           restore-keys: ${{ runner.os }}-gradle-
 
-      # ==================== 构建 APK ====================
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
-
+      # 6. 构建 Debug APK
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon
 
-      # ==================== 上传产物 ====================
-      - name: Upload Debug APK
+      # 7. 上传 APK 作为 Artifact（保留 30 天）
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: zhr-blog-debug-apk
