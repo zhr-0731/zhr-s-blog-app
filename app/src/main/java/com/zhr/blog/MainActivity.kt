@@ -23,9 +23,12 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 NavHost(navController, startDestination = "list") {
                     composable("list") {
-                        ArticleListScreen { url ->
-                            navController.navigate("detail/$url")
-                        }
+                        // 显式指定参数名，避免歧义
+                        ArticleListScreen(
+                            onArticleClick = { url ->
+                                navController.navigate("detail/$url")
+                            }
+                        )
                     }
                     composable(
                         route = "detail/{url}",
