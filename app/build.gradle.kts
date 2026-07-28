@@ -14,7 +14,8 @@ android {
         minSdk = 24
         targetSdk = 34
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
+        buildConfigField("String", "TIMESTAMP", "\"${System.currentTimeMillis()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -26,7 +27,20 @@ android {
                 "proguard-rules.pro"
             )
         }
+        debug {
+            versionNameSuffix = "-Beta"
+            applicationIdSuffix = ".debug"
+        }
     }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.forEach { output ->
+            val name = "zhr-blog-${variant.versionName}-${variant.buildType.name}.apk"
+            output.outputFileName = name
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
