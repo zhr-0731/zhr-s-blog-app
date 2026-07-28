@@ -33,11 +33,14 @@ android {
         }
     }
 
+    // 修正 APK 输出文件名（兼容 Kotlin DSL）
     applicationVariants.all {
         val variant = this
-        variant.outputs.forEach { output ->
+        variant.outputs.all {
+            val output = this
             val name = "zhr-blog-${variant.versionName}-${variant.buildType.name}.apk"
-            output.outputFileName = name
+            // 在 Kotlin DSL 中，outputFileName 是 BaseVariantOutput 的属性，直接赋值即可
+            (output as? com.android.build.gradle.internal.api.BaseVariantOutputImpl)?.outputFileName = name
         }
     }
 
