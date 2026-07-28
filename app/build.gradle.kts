@@ -33,13 +33,12 @@ android {
         }
     }
 
-    // 修正 APK 输出文件名（兼容 Kotlin DSL）
+    // 修正 APK 输出文件名
     applicationVariants.all {
         val variant = this
         variant.outputs.all {
             val output = this
             val name = "zhr-blog-${variant.versionName}-${variant.buildType.name}.apk"
-            // 在 Kotlin DSL 中，outputFileName 是 BaseVariantOutput 的属性，直接赋值即可
             (output as? com.android.build.gradle.internal.api.BaseVariantOutputImpl)?.outputFileName = name
         }
     }
@@ -53,6 +52,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true   // 关键修复：启用 BuildConfig 生成
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.4"
