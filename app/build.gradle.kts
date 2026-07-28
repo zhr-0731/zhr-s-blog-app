@@ -15,8 +15,14 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+
         buildConfigField("String", "TIMESTAMP", "\"${System.currentTimeMillis()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // 为 AndroidManifest.xml 中的占位符提供默认值
+        manifestPlaceholders["versionName"] = versionName
+        manifestPlaceholders["versionCode"] = versionCode.toString()
+        manifestPlaceholders["buildType"] = "debug" // 默认值，会被 buildTypes 覆盖
     }
 
     buildTypes {
@@ -26,14 +32,17 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            manifestPlaceholders["buildType"] = "release"
         }
         debug {
             versionNameSuffix = "-Beta"
             applicationIdSuffix = ".debug"
+            manifestPlaceholders["versionName"] = versionName + versionNameSuffix
+            manifestPlaceholders["buildType"] = "debug"
         }
     }
 
-    // 修正 APK 输出文件名
+    // 配置 APK 输出文件名
     applicationVariants.all {
         val variant = this
         variant.outputs.all {
@@ -52,7 +61,7 @@ android {
     }
     buildFeatures {
         compose = true
-        buildConfig = true   // 关键修复：启用 BuildConfig 生成
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.4"
