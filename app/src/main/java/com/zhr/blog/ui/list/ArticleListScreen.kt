@@ -1,5 +1,6 @@
 package com.zhr.blog.ui.list
 
+import android.os.Build
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.zhr.blog.BuildConfig
 import com.zhr.blog.data.model.Article
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,6 +26,12 @@ fun ArticleListScreen(
     val articles by viewModel.articles.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+
+    val versionDisplay = run {
+        val base = BuildConfig.VERSION_NAME
+        val suffix = if (BuildConfig.DEBUG) " Beta" else ""
+        "v$base$suffix"
+    }
 
     Scaffold(
         topBar = {
@@ -38,23 +46,38 @@ fun ArticleListScreen(
         }
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            when {
-                isLoading && articles.isEmpty() -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                error != null && articles.isEmpty() -> Column(
-                    Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally
+            Column(Modifier.fillMaxSize()) {
+                Surface(
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(error ?: "未知错误", color = MaterialTheme.colorScheme.error)
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = { viewModel.refresh() }) { Text("重试") }
+                    Text(
+                        text = "版本：$versionDisplay  |  构建：${BuildConfig.BUILD_TYPE}  |  构建时间：${BuildConfig.TIMESTAMP}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
                 }
-                else -> LazyColumn(
-                    Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    items(articles) { article ->
-                        ArticleCard(article) { onArticleClick(article.link) }
+                Box(Modifier.fillMaxSize()) {
+                    when {
+                        isLoading && articles.isEmpty() -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                        error != null && articles.isEmpty() -> Column(
+                            Modifier.align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(error ?: "未知错误", color = MaterialTheme.colorScheme.error)
+                            Spacer(Modifier.height(8.dp))
+                            Button(onClick = { viewModel.refresh() }) { Text("重试") }
+                        }
+                        else -> LazyColumn(
+                            Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(articles) { article ->
+                                ArticleCard(article) { onArticleClick(article.link) }
+                            }
+                        }
                     }
                 }
             }
