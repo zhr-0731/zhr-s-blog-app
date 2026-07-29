@@ -1,0 +1,114 @@
+name: Android Emulator Test (Multiple Screenshots)
+
+on:
+  workflow_dispatch:   # 仅允许手动触发
+
+permissions:
+  contents: write     # 授予写入权限，用于提交截图
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Download APK from apk/ directory (fallback to latest release)
+        id: apk
+        run: |
+          if [ -f "apk/*.apk" ]; then
+            APK_FILE=$(ls apk/*.apk | head -1)
+            echo "Found APK in apk/: $APK_FILE"
+            echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+          else
+            echo "No APK found in apk/, downloading from latest Release..."
+            gh release download nightly -p "*.apk" --dir ./apk/ || true
+            if [ -f "apk/*.apk" ]; then
+              APK_FILE=$(ls apk/*.apk | head -1)
+              echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+            else
+              echo "No APK available. Please run 'Build Android APK' workflow first."
+              exit 1
+            fi
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start Android Emulator and capture multiple screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          target: google_apis
+          arch: x86_64
+          profile: Nexus 5X
+          script: |
+            # 等待设备启动
+            adb wait-for-device
+            # 解锁屏幕
+            adb shell input keyevent 82
+
+            # 安装 APK
+            adb install ${{ steps.apk.outputs.apk_path }}
+
+            PACKAGE="com.zhr.blog"
+            ACTIVITY="${PACKAGE}/.MainActivity"
+
+            # 启动应用
+            adb shell am start -n $ACTIVITY
+
+            # ---- 截图 1：首页 ----
+            sleep 5
+            adb exec-out screencap -p > screenshot_1_home.png
+
+            # ---- 截图 2：滚动列表 ----
+            adb shell input swipe 500 1500 500 500   # 向下滑动
+            sleep 2
+            adb exec-out screencap -p > screenshot_2_scroll.png
+
+            # ---- 截图 3：点击第一篇文章进入详情 ----
+            # 注意：坐标 (500, 1000) 需要根据实际界面调整，这里仅为示例
+            adb shell input tap 500 1000
+            sleep 3
+            adb exec-out screencap -p > screenshot_3_detail.png
+
+            # ---- 截图 4：返回首页 ----
+            adb shell input keyevent 4   # 返回键
+            sleep 2
+            adb exec-out screencap -p > screenshot_4_back.png
+
+            # 你可以继续添加更多截图命令
+            # adb shell input tap x y
+            # sleep 2
+            # adb exec-out screencap -p > screenshot_5_xxx.png
+
+      - name: Upload screenshots to img/ directory and commit
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          mkdir -p img
+
+          # 将所有 screenshot_*.png 重命名并移动到 img/
+          for f in screenshot_*.png; do
+            if [ -f "$f" ]; then
+              # 提取原文件名（不含扩展名）并加时间戳
+              base="${f%.png}"
+              mv "$f" "img/${base}_${TIMESTAMP}.png"
+            fi
+          done
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add img/*.png
+          if ! git diff --cached --quiet; then
+            git commit -m "Add multiple screenshots from emulator test [skip ci]"
+            git push
+          else
+            echo "No new screenshots to commit."
+          fi
