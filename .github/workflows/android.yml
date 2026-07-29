@@ -59,21 +59,60 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
           restore-keys: ${{ runner.os }}-gradle-
 
+      # 构建 APK 并将输出同时保存到 build.log
       - name: Build APK
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Set APK path output
-        id: set-path
         run: |
-          APK_FILE=$(ls app/build/outputs/apk/debug/*.apk | head -1)
-          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+          ./gradlew assembleDebug --no-daemon 2>&1 | tee build.log
+        shell: bash
+
+      - name: Extract version info and generate version.json
+        id: version
+        run: |
+          # 从 build.gradle.kts 提取版本信息
+          versionName=$(grep 'versionName =' app/build.gradle.kts | head -1 | sed -E 's/.*versionName = "(.*)"/\1/')
+          versionCode=$(grep 'versionCode =' app/build.gradle.kts | head -1 | sed -E 's/.*versionCode = (.*)/\1/')
+          buildType="debug"
+          buildTime=$(date -Iseconds)
+          commitSha=${{ github.sha }}
+          runNumber=${{ github.run_number }}
+          apkFile=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          apkHash=$(sha256sum "$apkFile" | awk '{print $1}')
+          jq -n \
+            --arg vn "$versionName" \
+            --arg vc "$versionCode" \
+            --arg bt "$buildType" \
+            --arg btTime "$buildTime" \
+            --arg sha "$commitSha" \
+            --arg run "$runNumber" \
+            --arg hash "$apkHash" \
+            '{versionName: $vn, versionCode: $vc, buildType: $bt, buildTime: $btTime, commitSha: $sha, runNumber: $run, apkHash: $hash}' > version.json
+
+      - name: Prepare build info artifact
+        run: |
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          mkdir -p build-info/$TIMESTAMP
+          mv version.json build.log build-info/$TIMESTAMP/
+          echo "TIMESTAMP=$TIMESTAMP" >> $GITHUB_ENV
 
       - name: Upload APK as artifact (for later jobs)
         uses: actions/upload-artifact@v4
         with:
           name: debug-apk
           path: app/build/outputs/apk/debug/*.apk
-          retention-days: 1   # 仅需短期保留，因为后续 job 立即使用
+          retention-days: 1
+
+      - name: Upload build info artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-info
+          path: build-info/
+          retention-days: 1
+
+      - name: Set APK path output
+        id: set-path
+        run: |
+          APK_FILE=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
 
   upload-to-repo:
     runs-on: ubuntu-latest
@@ -130,3 +169,35 @@ jobs:
           files: ./apk/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  record-build-info:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download build info artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-info
+          path: ./build-info
+
+      - name: Copy files to json/ and log/ directories and commit
+        run: |
+          # 获取时间戳目录名（即 build-info 下的唯一子目录）
+          TIMESTAMP_DIR=$(ls build-info/ | head -1)
+          mkdir -p json log
+          cp build-info/$TIMESTAMP_DIR/version.json json/build_$TIMESTAMP_DIR.json
+          cp build-info/$TIMESTAMP_DIR/build.log log/build_$TIMESTAMP_DIR.log
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add json/ log/
+          if ! git diff --cached --quiet; then
+            git commit -m "Add build info for run ${{ github.run_number }} [skip ci]"
+            git push
+          else
+            echo "No changes to commit."
+          fi
