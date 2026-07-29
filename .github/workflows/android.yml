@@ -23,11 +23,6 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Install ImageMagick
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y imagemagick
-
       - name: Setup Gradle 8.2
         uses: gradle/actions/setup-gradle@v3
         with:
@@ -56,25 +51,6 @@ jobs:
             git commit -m "Add gradle-wrapper.jar [skip ci]"
             git push
           fi
-
-      - name: Download icon
-        run: |
-          curl -L -o icon.png https://s41.ax1x.com/2025/12/07/pZnSiid.png
-          if [ ! -s icon.png ]; then
-            convert -size 192x192 xc:blue -fill white -gravity center -pointsize 72 -annotate 0 "B" icon.png
-          fi
-
-      - name: Convert icon to mipmap
-        run: |
-          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            mkdir -p app/src/main/res/mipmap-$d
-          done
-          declare -A sizes=([mdpi]=48 [hdpi]=72 [xhdpi]=96 [xxhdpi]=144 [xxxhdpi]=192)
-          for d in "${!sizes[@]}"; do
-            s=${sizes[$d]}
-            convert icon.png -resize ${s}x${s} -background transparent -gravity center -extent ${s}x${s} app/src/main/res/mipmap-$d/ic_launcher.png
-            cp app/src/main/res/mipmap-$d/ic_launcher.png app/src/main/res/mipmap-$d/ic_launcher_round.png
-          done
 
       - name: Cache Gradle
         uses: actions/cache@v3
@@ -115,10 +91,7 @@ jobs:
 
       - name: Commit and push APK to repository root
         run: |
-          # 确保 apk 目录存在
           mkdir -p apk
-          # 将下载的 APK 移动到 apk 目录（如果下载时已经是文件，可能需要移动）
-          # 注意：下载的 artifact 可能是一个或多个 apk 文件，我们将其全部移动到 apk/ 下
           mv ./debug-apk/*.apk ./apk/ 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
