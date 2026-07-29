@@ -1,0 +1,69 @@
+name: Generate and Commit Icons
+
+on:
+  workflow_dispatch:  # 手动触发
+
+permissions:
+  contents: write     # 授予写入权限，以便提交代码
+
+jobs:
+  generate-icons:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up JDK 17 (for ImageMagick)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Install ImageMagick
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+
+      - name: Download icon from URL
+        run: |
+          ICON_URL="https://s41.ax1x.com/2025/12/07/pZnSiid.png"
+          curl -L -o icon.png "$ICON_URL"
+          if [ ! -s icon.png ]; then
+            echo "❌ Download failed, creating placeholder"
+            convert -size 192x192 xc:blue -fill white -gravity center -pointsize 72 -annotate 0 "B" icon.png
+          fi
+
+      - name: Convert to mipmap resources
+        run: |
+          for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p app/src/main/res/mipmap-$density
+          done
+          declare -A sizes=(
+            [mdpi]=48
+            [hdpi]=72
+            [xhdpi]=96
+            [xxhdpi]=144
+            [xxxhdpi]=192
+          )
+          for density in "${!sizes[@]}"; do
+            size=${sizes[$density]}
+            convert icon.png -resize ${size}x${size} -background transparent -gravity center -extent ${size}x${size} \
+              app/src/main/res/mipmap-$density/ic_launcher.png
+            cp app/src/main/res/mipmap-$density/ic_launcher.png \
+               app/src/main/res/mipmap-$density/ic_launcher_round.png
+          done
+
+      - name: Commit and push icons
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add app/src/main/res/mipmap-*/
+          if ! git diff --cached --quiet; then
+            git commit -m "Add app icons from remote URL [skip ci]"
+            git push
+          else
+            echo "No changes to commit (icons already exist)"
+          fi
