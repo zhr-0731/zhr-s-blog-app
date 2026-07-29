@@ -19,8 +19,8 @@ android {
         buildConfigField("String", "TIMESTAMP", "\"${System.currentTimeMillis()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // 使用只读副本避免智能转换问题
-        val vName = versionName
+        // 使用非空断言或默认值确保类型为 String
+        val vName = versionName ?: "1.0.0"
         val vCode = versionCode
         manifestPlaceholders["versionName"] = vName
         manifestPlaceholders["versionCode"] = vCode.toString()
@@ -34,16 +34,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // 从 defaultConfig 读取基础版本信息
-            manifestPlaceholders["versionName"] = android.defaultConfig.versionName
+            manifestPlaceholders["versionName"] = android.defaultConfig.versionName ?: "1.0.0"
             manifestPlaceholders["versionCode"] = android.defaultConfig.versionCode.toString()
             manifestPlaceholders["buildType"] = "release"
         }
         debug {
             versionNameSuffix = "-Beta"
             applicationIdSuffix = ".debug"
-            // 组合版本名
-            val base = android.defaultConfig.versionName
+            val base = android.defaultConfig.versionName ?: "1.0.0"
             manifestPlaceholders["versionName"] = base + versionNameSuffix
             manifestPlaceholders["versionCode"] = android.defaultConfig.versionCode.toString()
             manifestPlaceholders["buildType"] = "debug"
