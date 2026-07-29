@@ -19,8 +19,9 @@ android {
         buildConfigField("String", "TIMESTAMP", "\"${System.currentTimeMillis()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        manifestPlaceholders["versionName"] = versionName
-        manifestPlaceholders["versionCode"] = versionCode.toString()
+        // 临时占位符默认值（实际值由 buildTypes 覆盖）
+        manifestPlaceholders["versionName"] = "1.0.0"
+        manifestPlaceholders["versionCode"] = "1"
         manifestPlaceholders["buildType"] = "debug"
     }
 
@@ -31,10 +32,16 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            manifestPlaceholders["versionName"] = versionName
+            manifestPlaceholders["versionCode"] = versionCode.toString()
+            manifestPlaceholders["buildType"] = "release"
         }
         debug {
             versionNameSuffix = "-Beta"
             applicationIdSuffix = ".debug"
+            manifestPlaceholders["versionName"] = versionName + versionNameSuffix
+            manifestPlaceholders["versionCode"] = versionCode.toString()
+            manifestPlaceholders["buildType"] = "debug"
         }
     }
 
